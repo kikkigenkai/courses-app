@@ -1,9 +1,10 @@
 const {Router} = require('express');
 const Course = require('../models/course');
+const auth = require('../middleware/auth');
 const router = Router();
 
 router.get('/', async (req, res) => {
-    const courses = await Course.getAll();
+    const courses = await Course.find();
     res.render('courses', {
         title: 'Courses',
         isCourses: true,
@@ -11,12 +12,12 @@ router.get('/', async (req, res) => {
     });
 });
 
-router.get('/:id/edit', async (req, res) => {
+router.get('/:id/edit', auth, async (req, res) => {
     if (!req.query.allow) {
         return res.redirect('/');
     }    
 
-    const course = await Course.getById(req.params.id);
+    const course = await Course.findById(req.params.id);
 
     res.render('course-edit', {
         title: `Edit ${course.title}`,
@@ -24,13 +25,31 @@ router.get('/:id/edit', async (req, res) => {
     });
 });
 
-router.post('/edit', async (req, res) => {
-    await Course.update(req.body);
+router.post('/edit', auth, async (req, res) => {
+    const {id} = req.body;
+    delete req.body.id;
+
+    await Course.findByIdAndUpdate(id, req.body);
     res.redirect('/courses');
 });
 
+router.post('/remove', auth, async (req, res) => {
+    try {
+        await Course.deleteOne({_id: req.body.id});
+        res.redirect('/courses');
+    } catch (err) {
+        console.log(err);
+    }
+});
+
 router.get('/:id', async (req, res, next) => {
-    const course = await Course.getById(req.params.id);
+    const {id} = req.params;
+
+    let course;
+
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        course = await Course.findById(id);
+    } 
 
     try {
         res.render('course', {
@@ -41,7 +60,6 @@ router.get('/:id', async (req, res, next) => {
     } catch (err) {
         next(err);
     }
-    
 });
 
 module.exports = router;
